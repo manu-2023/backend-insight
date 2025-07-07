@@ -11,7 +11,6 @@ const pool = mysql.createPool({
 
 export const getInsight = async (req, res) => {
   try {
-    console.log('server hit');
     const table_name = process.env.DB_INSIGHT_TABLE_NAME;
 
     const [rows] = await pool.query(
@@ -19,15 +18,12 @@ export const getInsight = async (req, res) => {
     );
 
     if (rows.length <= 0) {
-      console.log('Not found');
       return res.status(404).json({ message: 'No insights found !!' });
     }
 
-    console.log('Found');
     return res.status(200).json(rows[0]);
 
   } catch (err) {
-    console.error('DB Error:', err); // <-- Add logging
     return res.status(500).json({ error: 'Internal server error' });
   }
 };

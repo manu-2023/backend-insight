@@ -1,2 +1,2 @@
-Give me insights based on this data what you observer 
-no table required 
+Give me insights based on this data 
+No table required

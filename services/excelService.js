@@ -53,7 +53,7 @@ function saveImmediateInsight(index, insight) {
     try {
         promptText = fs.readFileSync(promptPath, 'utf-8').trim();
     } catch (err) {
-        console.error(`⚠️ Failed to read prompt file: ${err.message}`);
+        throw new Error(`Prompt file "${promptPath}" not found: ${err.message}`);
     }
 
     const fullText = `🔹 Chunk ${index + 1} Prompt Used:\n${promptText}\n\n🔹 Chunk ${index + 1} Insight:\n${insight.trim()}`;
@@ -86,7 +86,6 @@ async function runExcelPython(filters, filePath) {
     return new Promise((resolve, reject) => {
         const pyScriptPath = path.join(__dirname, '../scripts/filter.py').replace(/\\/g, '/');
         const filtersJSON = JSON.stringify({ ...filters, filePath });
-        console.log(`🐍 Running Python with spawn:`);
 
         const process = spawn('python', [pyScriptPath, filtersJSON]);
 
@@ -103,17 +102,14 @@ async function runExcelPython(filters, filePath) {
 
         process.on('close', (code) => {
             if (code !== 0) {
-                console.error("Python stderr:", stderr);
                 return reject('Python script failed');
             }
 
             try {
                 const data = JSON.parse(stdout.trim());
-                console.log('Filtered data', data);
                 if (data.error) return reject(data.error);
                 resolve(data);
             } catch (err) {
-                console.error("Parsing error:", err.message);
                 reject('Failed to parse filtered data');
             }
         });
@@ -132,8 +128,8 @@ async function saveFinalInsightToDB(sourceType, filters, finalInsight) {
     const istDate = new Date(nowIST);
 
     // Insert including created_at
-    let table_name = process.env.DB_INSIGHT_TABLE_NAME ;
-      await connection.execute(
+    let table_name = process.env.DB_INSIGHT_TABLE_NAME;
+    await connection.execute(
         `INSERT INTO ${table_name} (source_type, filters, insight, donar_name, created_at, privacy) VALUES (?, ?, ?, ?, ?, ?)`,
         [sourceType, JSON.stringify(filters), finalInsight, "", istDate, 'private']
     );
@@ -142,19 +138,15 @@ async function saveFinalInsightToDB(sourceType, filters, finalInsight) {
 }
 
 function getLatestUploadedFile() {
-    console.log('📁 Checking upload folder:', uploadDir);
     const uploadDir = path.join(__dirname, '../uploadedFile');
 
     if (!fs.existsSync(uploadDir)) {
-        console.log('❌ Folder does not exist');
         throw new Error('📂 Upload folder does not exist');
     }
 
     const files = fs.readdirSync(uploadDir);
-    console.log('📄 All files found:', files);
 
     const validFiles = files.filter(f => f.endsWith('.xlsx') || f.endsWith('.csv'));
-    console.log('✅ Valid Excel/CSV files:', validFiles);
 
     if (validFiles.length === 0) {
         throw new Error('❌ No uploaded Excel/CSV files found');
@@ -172,10 +164,8 @@ function getLatestUploadedFile() {
 export async function handleExcelWorkflow(filters, filePath) {
     const actualFilePath = filePath || getLatestUploadedFile();
     const data = await runExcelPython(filters, actualFilePath);
-    console.log(`📊 Filtered data rows: ${data.length}`);
 
     const chunks = splitChunks(data);
-    console.log(`📦 Total chunks to process: ${chunks.length}`);
 
     deleteImmediateInsightFiles();
     const failedChunks = [];
@@ -185,14 +175,12 @@ export async function handleExcelWorkflow(filters, filePath) {
     try {
         chunkPromptTemplate = loadPromptTemplate('chunk_excel_prompt.txt');
     } catch (err) {
-        console.error('❌ Prompt file not found:', err.message);
         throw new Error('Prompt template missing');
     }
 
     const tasks = chunks.map((chunk, index) =>
         limit(async () => {
             if (!chunk || chunk.length === 0) {
-                console.warn(`⚠️ Skipping empty chunk ${index + 1}`);
                 return;
             }
 
@@ -204,16 +192,13 @@ export async function handleExcelWorkflow(filters, filePath) {
             try {
                 const insight = await callOpenAI(prompt);
                 if (!insight || insight.trim() === '') {
-                    console.warn(`⚠️ Empty insight returned for chunk ${index + 1}`);
                     failedChunks.push({ chunk, index });
                     return;
                 }
 
                 saveImmediateInsight(index, insight, prompt);
                 successCount++;
-                console.log(`✅ Insight saved for chunk ${index + 1}`);
             } catch (err) {
-                console.error(`❌ Chunk ${index + 1} failed:`, err.message);
                 failedChunks.push({ chunk, index });
             }
         })
@@ -222,26 +207,21 @@ export async function handleExcelWorkflow(filters, filePath) {
     await Promise.all(tasks);
 
     for (const { chunk, index } of failedChunks) {
-        try {
-            const chunkData = JSON.stringify(chunk);
-            console.log(JSON.stringify(chunk, null, 2));
-            const prompt = chunkPromptTemplate.includes('{{data}}')
-                ? chunkPromptTemplate.replace('{{data}}', chunkData)
-                : `${chunkPromptTemplate}\n\n${chunkData}`;
 
-            const retryInsight = await callOpenAI(prompt);
+        const chunkData = JSON.stringify(chunk);
+        const prompt = chunkPromptTemplate.includes('{{data}}')
+            ? chunkPromptTemplate.replace('{{data}}', chunkData)
+            : `${chunkPromptTemplate}\n\n${chunkData}`;
 
-            if (!retryInsight || retryInsight.trim() === '') {
-                console.warn(`⚠️ Still no insight for chunk ${index + 1} after retry`);
-                continue;
-            }
+        const retryInsight = await callOpenAI(prompt);
 
-            saveImmediateInsight(index, retryInsight, prompt);
-            successCount++;
-            console.log(`✅ Retry success for chunk ${index + 1}`);
-        } catch (err) {
-            console.error(`❌ Final failure for chunk ${index + 1}:`, err.message);
+        if (!retryInsight || retryInsight.trim() === '') {
+            continue;
         }
+
+        saveImmediateInsight(index, retryInsight, prompt);
+        successCount++;
+
     }
 
     if (successCount === 0) throw new Error('No valid chunk insights generated');
@@ -268,7 +248,6 @@ export async function handleExcelWorkflow(filters, filePath) {
     const finalPrompt = finalPromptTemplate.includes('{{data}}')
         ? finalPromptTemplate.replace('{{data}}', combinedText)
         : `${finalPromptTemplate}\n\n${combinedText}`;
-    console.log('Generrating final insight with prompt:', finalPrompt);
 
     let finalInsight;
     try {
@@ -277,7 +256,6 @@ export async function handleExcelWorkflow(filters, filePath) {
             throw new Error('Empty response from AI for final insight');
         }
     } catch (err) {
-        console.error('❌ Final AI call failed:', err.message);
         throw new Error('Failed to generate final insight: ' + err.message);
     }
 

@@ -12,7 +12,6 @@ const promptDir = path.join(__dirname, '../prompts');
 export const unifiedHandler = async (req, res) => {
     try {
         const { source, filters, prompt, filePath,tableName } = req.body;
-        console.log('Maga prompt', prompt)
 
         if (!source) return res.status(400).json({ error: 'Source is required' });
 
@@ -21,19 +20,16 @@ export const unifiedHandler = async (req, res) => {
 
         if (prompt && prompt.trim() !== '') {
             fs.writeFileSync(promptPath, prompt, 'utf-8');
-            console.log("Custom prompt saved by admin.");
         } else {
             if (!fs.existsSync(promptPath)) {
                 return res.status(400).json({ error: 'No prompt provided and no existing default prompt found.' });
             }
-            console.log("⚠️ No prompt given, using previously saved prompt.");
         }
 
         if (source === 'excel') {
             let finalFilePath = filePath;
             if (!finalFilePath && source === 'excel') {
                 const latest = getLatestUploadedFile();
-                console.log('Latest path maga', latest)
                 if (latest === null) {
                     return res.status(400).json({ message: 'No Excel file found in uploadedFile folder' })
                 };
@@ -56,7 +52,6 @@ export const unifiedHandler = async (req, res) => {
         }
 
     } catch (err) {
-        console.error('Unified handler error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

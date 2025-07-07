@@ -15,15 +15,12 @@ export const getSelectedColumns = (req, res) => {
   }
 
   // 🔧 Normalize relative path
-  console.log("received path", filePath)
   const cleanedPath = filePath.replace(/^\/+/, ''); // remove leading slashes
   const absolutePath = path.resolve(__dirname, '..', '..', cleanedPath);
-  console.log('✅ Final resolved path:', absolutePath);
 
 
 
   if (!fs.existsSync(absolutePath)) {
-    console.error(`❌ File not found: ${absolutePath}`);
     return res.status(404).json({ error: 'Uploaded file not found. Please re-upload.' });
   }
 
@@ -33,7 +30,6 @@ export const getSelectedColumns = (req, res) => {
 
   exec(cmd, (error, stdout, stderr) => {
     if (error) {
-      console.error('❌ Python script error:', error.message);
       return res.status(500).json({ error: 'Python script failed to extract column data.' });
     }
 
@@ -41,8 +37,6 @@ export const getSelectedColumns = (req, res) => {
       const values = JSON.parse(stdout);
       return res.json(values);
     } catch (parseErr) {
-      console.error('❌ JSON parse error from Python stdout:', parseErr.message);
-      console.error('🔍 Raw stdout:', stdout);
       return res.status(500).json({ error: 'Failed to parse Python output.' });
     }
   });

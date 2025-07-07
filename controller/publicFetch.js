@@ -13,7 +13,6 @@ const pool = mysql.createPool({
 export const publicFetch = async (req, res) => {
     let { donar_name } = req.body;
     try {
-        console.log('server hit');
         const table_name = process.env.DB_INSIGHT_TABLE_NAME;
 
         if (!donar_name) {
@@ -40,10 +39,8 @@ export const publicFetch = async (req, res) => {
         );
 
 
-        console.log('rows', rows);
 
         if (rows.length <= 0) {
-            console.log('Not found');
             return res.status(404).json({ message: 'No insights found !!' });
         }
 
