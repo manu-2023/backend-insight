@@ -75,7 +75,7 @@ function saveImmediateInsight(index, insight) {
     try {
         promptText = fs.readFileSync(promptPath, 'utf-8').trim();
     } catch (err) {
-        console.error(`⚠️ Failed to read prompt file: ${err.message}`);
+        throw new Error(`Prompt file "${promptPath}" not found: ${err.message}`);
     }
 
     const fullText = `🔹 Chunk ${index + 1} Prompt Used:\n${promptText}\n\n🔹 Chunk ${index + 1} Insight:\n${insight.trim()}`;
@@ -141,11 +141,8 @@ export async function handleSQLWorkflow(filters, tableName) {
         throw new Error('No data found for the given filters');
     }
 
-    console.log(`📊 Retrieved ${rows.length} rows from SQL`);
 
     const chunks = splitChunks(rows);
-    console.log(`📦 Total SQL chunks to process: ${chunks.length}`);
-
     deleteImmediateInsightFiles();
     const failedChunks = [];
     let successCount = 0;
@@ -154,14 +151,12 @@ export async function handleSQLWorkflow(filters, tableName) {
     try {
         chunkPromptTemplate = loadPromptTemplate('chunk_sql_prompt.txt');
     } catch (err) {
-        console.error('❌ Prompt file not found:', err.message);
         throw new Error('Prompt template missing');
     }
 
     const tasks = chunks.map((chunk, index) =>
         limit(async () => {
             if (!chunk || chunk.length === 0) {
-                console.warn(`⚠️ Skipping empty chunk ${index + 1}`);
                 return;
             }
 
@@ -179,10 +174,8 @@ export async function handleSQLWorkflow(filters, tableName) {
 
                 saveImmediateInsight(index, insight, prompt);
                 successCount++;
-                console.log(`✅ Insight saved for SQL chunk ${index + 1}`);
             } catch (err) {
                 failedChunks.push({ chunk, index });
-                console.error(`❌ SQL chunk ${index + 1} failed:`, err.message);
             }
         })
     );
@@ -198,15 +191,12 @@ export async function handleSQLWorkflow(filters, tableName) {
 
             const retryInsight = await callOpenAI(prompt);
             if (!retryInsight || retryInsight.trim() === '') {
-                console.warn(`⚠️ Retry failed for chunk ${index + 1}`);
                 continue;
             }
 
             saveImmediateInsight(index, retryInsight, prompt);
             successCount++;
-            console.log(`✅ Retry success for chunk ${index + 1}`);
         } catch (err) {
-            console.error(`❌ Final retry failed for chunk ${index + 1}:`, err.message);
         }
     }
 
@@ -242,7 +232,6 @@ export async function handleSQLWorkflow(filters, tableName) {
             throw new Error('Empty response from AI for final SQL insight');
         }
     } catch (err) {
-        console.error('❌ Final SQL AI call failed:', err.message);
         throw new Error('Failed to generate final SQL insight: ' + err.message);
     }
 

@@ -19,7 +19,6 @@ export const getTableController = async (req, res) => {
     const tableNames = rows.map(row => Object.values(row)[0]);
     res.json({ tables: tableNames });
   } catch (error) {
-    console.error(' Error fetching table names:', error);
     res.status(500).json({ error: 'Failed to fetch table names' });
   }
 };
