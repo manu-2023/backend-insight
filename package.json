@@ -14,7 +14,6 @@
     "axios": "^1.9.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "epxress": "^0.0.1-security",
     "express": "^5.1.0",
     "multer": "^2.0.1",
     "mysql2": "^3.14.1",
@@ -22,7 +21,7 @@
     "node-fetch": "^3.3.2",
     "openai": "^5.7.0",
     "p-limit": "^6.2.0",
-    "together-ai": "^0.16.0",
+    "together-ai": "^0.17.0",
     "undici": "^7.11.0",
     "xlsx": "^0.18.5"
   }

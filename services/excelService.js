@@ -3,15 +3,12 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import mysql from 'mysql2/promise';
-import { Together } from 'together-ai';
 import pLimit from 'p-limit';
-import { callOpenAI } from './aiService.js';
-import { response } from 'express';
+import { callDeepseekAI } from './aiService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const together = new Together();
 const limit = pLimit(5);
 const MAX_CHARS = 200000;
 const immediateFolder = path.join(__dirname, '../immediate_insights');
@@ -123,11 +120,9 @@ async function saveFinalInsightToDB(sourceType, filters, finalInsight) {
         database: process.env.DB_NAME
     });
 
-    // Convert current time to IST
     const nowIST = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
     const istDate = new Date(nowIST);
 
-    // Insert including created_at
     let table_name = process.env.DB_INSIGHT_TABLE_NAME;
     await connection.execute(
         `INSERT INTO ${table_name} (source_type, filters, insight, donar_name, created_at, privacy) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -190,7 +185,7 @@ export async function handleExcelWorkflow(filters, filePath) {
                 : `${chunkPromptTemplate}\n\n${chunkData}`;
 
             try {
-                const insight = await callOpenAI(prompt);
+                const insight = await callDeepseekAI(prompt);
                 if (!insight || insight.trim() === '') {
                     failedChunks.push({ chunk, index });
                     return;
@@ -213,7 +208,7 @@ export async function handleExcelWorkflow(filters, filePath) {
             ? chunkPromptTemplate.replace('{{data}}', chunkData)
             : `${chunkPromptTemplate}\n\n${chunkData}`;
 
-        const retryInsight = await callOpenAI(prompt);
+        const retryInsight = await callDeepseekAI(prompt);
 
         if (!retryInsight || retryInsight.trim() === '') {
             continue;
@@ -251,7 +246,7 @@ export async function handleExcelWorkflow(filters, filePath) {
 
     let finalInsight;
     try {
-        finalInsight = await callOpenAI(finalPrompt);
+        finalInsight = await callDeepseekAI(finalPrompt);
         if (!finalInsight || finalInsight.trim() === '') {
             throw new Error('Empty response from AI for final insight');
         }

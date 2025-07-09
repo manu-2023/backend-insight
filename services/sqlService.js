@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import pLimit from 'p-limit';
-import { callOpenAI } from './aiService.js';
+import { callDeepseekAI } from './aiService.js';
 
 
 dotenv.config();
@@ -166,7 +166,7 @@ export async function handleSQLWorkflow(filters, tableName) {
                 : `${chunkPromptTemplate}\n\n${chunkData}`;
 
             try {
-                const insight = await callOpenAI(prompt);
+                const insight = await callDeepseekAI(prompt);
                 if (!insight || insight.trim() === '') {
                     failedChunks.push({ chunk, index });
                     return;
@@ -189,7 +189,7 @@ export async function handleSQLWorkflow(filters, tableName) {
                 ? chunkPromptTemplate.replace('{{data}}', chunkData)
                 : `${chunkPromptTemplate}\n\n${chunkData}`;
 
-            const retryInsight = await callOpenAI(prompt);
+            const retryInsight = await callDeepseekAI(prompt);
             if (!retryInsight || retryInsight.trim() === '') {
                 continue;
             }
@@ -227,16 +227,14 @@ export async function handleSQLWorkflow(filters, tableName) {
         : `${finalPromptTemplate}\n\n${combinedText}`;
 
     try {
-        finalInsight = await callOpenAI(finalPrompt);
+        finalInsight = await callDeepseekAI(finalPrompt);
         if (!finalInsight || finalInsight.trim() === '') {
             throw new Error('Empty response from AI for final SQL insight');
         }
     } catch (err) {
         throw new Error('Failed to generate final SQL insight: ' + err.message);
     }
-
     deleteImmediateInsightFiles();
-
     await saveFinalInsightToDB('sql', filters, finalInsight);
     return finalInsight;
 }
