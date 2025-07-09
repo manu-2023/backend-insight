@@ -160,6 +160,9 @@ export async function handleExcelWorkflow(filters, filePath) {
     const actualFilePath = filePath || getLatestUploadedFile();
     const data = await runExcelPython(filters, actualFilePath);
 
+   
+
+
     const chunks = splitChunks(data);
 
     deleteImmediateInsightFiles();
@@ -182,7 +185,7 @@ export async function handleExcelWorkflow(filters, filePath) {
             const chunkData = JSON.stringify(chunk);
             const prompt = chunkPromptTemplate.includes('{{data}}')
                 ? chunkPromptTemplate.replace('{{data}}', chunkData)
-                : `${chunkPromptTemplate}\n\n${chunkData}`;
+                : `${chunkData}\n\n${chunkPromptTemplate}`;
 
             try {
                 const insight = await callDeepseekAI(prompt);
@@ -206,7 +209,7 @@ export async function handleExcelWorkflow(filters, filePath) {
         const chunkData = JSON.stringify(chunk);
         const prompt = chunkPromptTemplate.includes('{{data}}')
             ? chunkPromptTemplate.replace('{{data}}', chunkData)
-            : `${chunkPromptTemplate}\n\n${chunkData}`;
+            : `${chunkData}\n\n${chunkPromptTemplate}`;
 
         const retryInsight = await callDeepseekAI(prompt);
 
