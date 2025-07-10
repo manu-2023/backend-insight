@@ -12,7 +12,7 @@ import getColumnsSql from './routes/SQLRoutes/getColumnsRouterSql.js'
 import savePermissionRoutes from  './routes/savePermissionRoutes.js'
 import getCellValuesSQLRoutes from './controller/SQL/getCellValuesSQL.js';
 import getPublicFetch from './routes/publicfetchRoutes.js';
-
+import  modifyInsightsRoutes  from './routes/modifyInsightsRoutes.js';
 const app = express();
 const PORT = 5000;
 
@@ -31,6 +31,8 @@ app.use('/api/save-permission',savePermissionRoutes)
 
 app.use('/api/get-cell-values-sql',getCellValuesSQLRoutes);
 app.use('/public-fetch', getPublicFetch);
+
+app.use('/api/modify-insights', modifyInsightsRoutes);
 
 
 app.listen(PORT, () => {

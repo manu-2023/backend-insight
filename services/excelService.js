@@ -160,7 +160,7 @@ export async function handleExcelWorkflow(filters, filePath) {
     const actualFilePath = filePath || getLatestUploadedFile();
     const data = await runExcelPython(filters, actualFilePath);
 
-   
+
 
 
     const chunks = splitChunks(data);
