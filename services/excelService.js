@@ -14,6 +14,7 @@ const MAX_CHARS = 200000;
 const immediateFolder = path.join(__dirname, '../immediate_insights');
 
 function splitChunks(data, maxChars = MAX_CHARS) {
+    console.log('🔹 Splitting data into chunks');
     const chunks = [];
     let currentChunk = [];
     let currentLength = 0;
@@ -30,10 +31,12 @@ function splitChunks(data, maxChars = MAX_CHARS) {
     }
 
     if (currentChunk.length > 0) chunks.push(currentChunk);
+    console.log(`✅ Total chunks created: ${chunks.length}`);
     return chunks;
 }
 
 function deleteImmediateInsightFiles() {
+    console.log('🧹 Deleting previous immediate insight files');
     if (!fs.existsSync(immediateFolder)) return;
     fs.readdirSync(immediateFolder).forEach(file =>
         fs.unlinkSync(path.join(immediateFolder, file))
@@ -41,6 +44,7 @@ function deleteImmediateInsightFiles() {
 }
 
 function saveImmediateInsight(index, insight) {
+    console.log(`💾 Saving immediate insight for chunk ${index + 1}`);
     if (!fs.existsSync(immediateFolder)) fs.mkdirSync(immediateFolder);
 
     const filePath = path.join(immediateFolder, `chunk_${index + 1}.txt`);
@@ -59,6 +63,7 @@ function saveImmediateInsight(index, insight) {
 }
 
 function readStructuredImmediateInsights() {
+    console.log('📖 Reading structured immediate insight files');
     if (!fs.existsSync(immediateFolder)) return '';
     const files = fs.readdirSync(immediateFolder).sort();
     if (files.length === 0) return '';
@@ -80,6 +85,7 @@ function loadPromptTemplate(filename) {
 }
 
 async function runExcelPython(filters, filePath) {
+    console.log('🚀 Running Python script with filters:', filters);
     return new Promise((resolve, reject) => {
         const pyScriptPath = path.join(__dirname, '../scripts/filter.py').replace(/\\/g, '/');
         const filtersJSON = JSON.stringify({ ...filters, filePath });
@@ -99,20 +105,25 @@ async function runExcelPython(filters, filePath) {
 
         process.on('close', (code) => {
             if (code !== 0) {
+                console.error('❌ Python script failed:', stderr);
                 return reject('Python script failed');
             }
 
             try {
                 const data = JSON.parse(stdout.trim());
                 if (data.error) return reject(data.error);
+                console.log('✅ Python script executed successfully');
                 resolve(data);
             } catch (err) {
+                console.error('❌ Failed to parse Python output');
                 reject('Failed to parse filtered data');
             }
         });
     });
 }
-async function saveFinalInsightToDB(sourceType, filters, finalInsight) {
+
+async function saveFinalInsightToDB(finalInsight) {
+    console.log('💾 Saving final insight to DB');
     const connection = await mysql.createConnection({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
@@ -125,14 +136,16 @@ async function saveFinalInsightToDB(sourceType, filters, finalInsight) {
 
     let table_name = process.env.DB_INSIGHT_TABLE_NAME;
     await connection.execute(
-        `INSERT INTO ${table_name} (source_type, filters, insight, donar_name, created_at, privacy) VALUES (?, ?, ?, ?, ?, ?)`,
-        [sourceType, JSON.stringify(filters), finalInsight, "", istDate, 'private']
+        `INSERT INTO ${table_name} (insight, created_at) VALUES (?, ?)`,
+        [finalInsight, istDate]
     );
 
     await connection.end();
+    console.log('✅ Final insight saved successfully');
 }
 
 function getLatestUploadedFile() {
+    console.log('📂 Getting latest uploaded file');
     const uploadDir = path.join(__dirname, '../uploadedFile');
 
     if (!fs.existsSync(uploadDir)) {
@@ -140,7 +153,6 @@ function getLatestUploadedFile() {
     }
 
     const files = fs.readdirSync(uploadDir);
-
     const validFiles = files.filter(f => f.endsWith('.xlsx') || f.endsWith('.csv'));
 
     if (validFiles.length === 0) {
@@ -151,17 +163,14 @@ function getLatestUploadedFile() {
         .map(name => ({ name, time: fs.statSync(path.join(uploadDir, name)).mtime.getTime() }))
         .sort((a, b) => b.time - a.time);
 
+    console.log(`✅ Latest file: ${sorted[0].name}`);
     return path.join(uploadDir, sorted[0].name);
 }
 
-
-
 export async function handleExcelWorkflow(filters, filePath) {
+    console.log('🏁 Starting Excel workflow');
     const actualFilePath = filePath || getLatestUploadedFile();
     const data = await runExcelPython(filters, actualFilePath);
-
-
-
 
     const chunks = splitChunks(data);
 
@@ -173,14 +182,13 @@ export async function handleExcelWorkflow(filters, filePath) {
     try {
         chunkPromptTemplate = loadPromptTemplate('chunk_excel_prompt.txt');
     } catch (err) {
+        console.error('❌ Prompt template missing');
         throw new Error('Prompt template missing');
     }
 
     const tasks = chunks.map((chunk, index) =>
         limit(async () => {
-            if (!chunk || chunk.length === 0) {
-                return;
-            }
+            if (!chunk || chunk.length === 0) return;
 
             const chunkData = JSON.stringify(chunk);
             const prompt = chunkPromptTemplate.includes('{{data}}')
@@ -188,15 +196,17 @@ export async function handleExcelWorkflow(filters, filePath) {
                 : `${chunkData}\n\n${chunkPromptTemplate}`;
 
             try {
+                console.log(`🤖 Generating AI insight for chunk ${index + 1}`);
                 const insight = await callDeepseekAI(prompt);
                 if (!insight || insight.trim() === '') {
                     failedChunks.push({ chunk, index });
+                    console.warn(`⚠️ Empty insight for chunk ${index + 1}`);
                     return;
                 }
-
                 saveImmediateInsight(index, insight, prompt);
                 successCount++;
             } catch (err) {
+                console.error(`❌ Error processing chunk ${index + 1}`);
                 failedChunks.push({ chunk, index });
             }
         })
@@ -205,7 +215,7 @@ export async function handleExcelWorkflow(filters, filePath) {
     await Promise.all(tasks);
 
     for (const { chunk, index } of failedChunks) {
-
+        console.log(`🔁 Retrying chunk ${index + 1}`);
         const chunkData = JSON.stringify(chunk);
         const prompt = chunkPromptTemplate.includes('{{data}}')
             ? chunkPromptTemplate.replace('{{data}}', chunkData)
@@ -214,12 +224,12 @@ export async function handleExcelWorkflow(filters, filePath) {
         const retryInsight = await callDeepseekAI(prompt);
 
         if (!retryInsight || retryInsight.trim() === '') {
+            console.warn(`⚠️ Retry failed for chunk ${index + 1}`);
             continue;
         }
 
         saveImmediateInsight(index, retryInsight, prompt);
         successCount++;
-
     }
 
     if (successCount === 0) throw new Error('No valid chunk insights generated');
@@ -230,14 +240,11 @@ export async function handleExcelWorkflow(filters, filePath) {
     if (chunks.length === 1) {
         const onlyFile = fs.readdirSync(immediateFolder)[0];
         const raw = fs.readFileSync(path.join(immediateFolder, onlyFile), 'utf-8');
-
-        const insightOnly = raw
-            .split('🔹 Chunk 1 Insight:')[1]?.trim()
-            || raw.trim();
+        const insightOnly = raw.split('🔹 Chunk 1 Insight:')[1]?.trim() || raw.trim();
 
         deleteImmediateInsightFiles();
 
-        await saveFinalInsightToDB('excel', filters, insightOnly);
+        await saveFinalInsightToDB(insightOnly);
         return insightOnly;
     }
 
@@ -249,16 +256,19 @@ export async function handleExcelWorkflow(filters, filePath) {
 
     let finalInsight;
     try {
+        console.log('🧠 Generating final combined insight');
         finalInsight = await callDeepseekAI(finalPrompt);
         if (!finalInsight || finalInsight.trim() === '') {
             throw new Error('Empty response from AI for final insight');
         }
     } catch (err) {
+        console.error('❌ Final insight generation failed:', err);
         throw new Error('Failed to generate final insight: ' + err.message);
     }
 
     deleteImmediateInsightFiles();
 
-    await saveFinalInsightToDB('excel', filters, finalInsight);
+    await saveFinalInsightToDB(finalInsight);
+    console.log('🎉 Excel workflow completed successfully');
     return finalInsight;
 }

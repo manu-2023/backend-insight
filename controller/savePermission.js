@@ -1,5 +1,5 @@
-import mysql from 'mysql2/promise'
-import dotenv from 'dotenv'
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -12,29 +12,54 @@ const pool = mysql.createPool({
 });
 
 const savePermission = async (req, res) => {
-    const { id, permission, donarName } = req.body;
+    const { source_type, donorName } = req.body;
+
     try {
-        if (!permission || !id ) {
-            return res.status(400).json({ error: 'Permission, ID, and Donor name are all required fields.' });
+        if (!source_type) {
+            return res.status(400).json({ error: 'Source type is missing!' });
         }
-        const table_name = process.env.DB_INSIGHT_TABLE_NAME;
-        const column_name = 'privacy';
-        const donar_name_column = 'donar_name';
-        const query = `UPDATE ${table_name} SET ${column_name} = ? ,${donar_name_column}= ? WHERE id = ?`;
-        const [result] = await pool.execute(query, [permission, donarName,id]);
+
+        console.log('📥 Inserting permission...');
+        console.log('📦 Source Type:', source_type);
+        console.log('👤 Donor Name:', donorName);
+
+        const table_name = process.env.DB_MAIN_INSIGHT_TABLE_NAME;
+        const second_insight_table_name = process.env.DB_INSIGHT_TABLE_NAME;
+
+        // Step 1: Get last insight
+        const [second_insight] = await pool.query(
+            `SELECT insight FROM ${second_insight_table_name} ORDER BY created_at DESC LIMIT 1`
+        );
+        if (second_insight.length === 0) {
+            return res.status(404).json({ error: 'No insights found in the second table' });
+        }
+
+        // Step 2: Delete that insight
+        const [deletedRows] = await pool.query(
+            `DELETE FROM ${second_insight_table_name} ORDER BY created_at DESC LIMIT 1`
+        );
+        if (deletedRows.affectedRows === 0) {
+            return res.status(404).json({ error: 'No rows deleted from the second table' });
+        }
+
+        // Step 3: Insert into main table
+        const query = `INSERT INTO ${table_name} (insight, source_type, donor_name, created_at) VALUES (?, ?, ?, NOW())`;
+        const [result] = await pool.execute(query, [
+            second_insight[0].insight,
+            source_type,
+            donorName || null
+        ]);
+
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'No record found to update' });
+            return res.status(500).json({ error: 'Failed to save permission' });
         }
 
-        else {
-            return res.status(200).json({ message: 'Permission updated successfully' });
-        }
+        return res.status(200).json({ message: 'Permission saved successfully' });
 
-    }
-    catch (err) {
+    } catch (err) {
+        console.error('❌ DB Insert Error:', err.message);
         return res.status(500).json({ error: 'Internal server error' });
-
     }
-}
+};
 
 export default savePermission;

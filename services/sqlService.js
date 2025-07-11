@@ -15,24 +15,23 @@ const __dirname = path.dirname(__filename);
 const MAX_CHARS = 200000;
 const immediateFolder = path.join(__dirname, '../immediate_insights');
 
-async function saveFinalInsightToDB(sourceType, filters, finalInsight) {
-    const connection = await mysql.createConnection({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME
-    });
-
-    const nowIST = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-    const istDate = new Date(nowIST);
-
-    const tableName = process.env.DB_INSIGHT_TABLE_NAME;
-
-    await connection.execute(
-        `INSERT INTO ${tableName} (source_type, filters, insight, donar_name, created_at, privacy) VALUES (?, ?, ?, ?, ?, ?)`,
-        [sourceType, JSON.stringify(filters), finalInsight, "", istDate, 'private']
-    );
-
+async function saveFinalInsightToDB(finalInsight) {
+  console.log('💾 Saving final insight to DB');
+      const connection = await mysql.createConnection({
+          host: process.env.DB_HOST,
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+          database: process.env.DB_NAME
+      });
+  
+      const nowIST = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+      const istDate = new Date(nowIST);
+  
+      let table_name = process.env.DB_INSIGHT_TABLE_NAME;
+      await connection.execute(
+          `INSERT INTO ${table_name} (insight, created_at) VALUES (?, ?)`,
+          [finalInsight, istDate]
+      )
 
     await connection.end();
 }
@@ -217,7 +216,7 @@ export async function handleSQLWorkflow(filters, tableName) {
 
         deleteImmediateInsightFiles();
 
-        await saveFinalInsightToDB('sql', filters, insightOnly);
+        await saveFinalInsightToDB(insightOnly);
         return insightOnly;
     }
 
@@ -235,6 +234,6 @@ export async function handleSQLWorkflow(filters, tableName) {
         throw new Error('Failed to generate final SQL insight: ' + err.message);
     }
     deleteImmediateInsightFiles();
-    await saveFinalInsightToDB('sql', filters, finalInsight);
+    await saveFinalInsightToDB(finalInsight);
     return finalInsight;
 }

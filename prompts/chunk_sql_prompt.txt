@@ -1,4 +1,1 @@
-Give me insights based on this data 
-I dont need any tables anything extra emojis 
-I need you to check twice 
-and i dont need any headers from you just Insights is enough
+Generate an insights based on this data
