@@ -1,12 +1,8 @@
-You are an expert education program evaluator.
-
 Each section below contains the original prompt used to generate insights for a specific data chunk, followed by the AI-generated insight for that chunk.
 
-Please analyze all the chunk-level insights holistically and generate a **final executive summary** that represents the entire dataset.
+Please analyze all the chunk-level insights     generate a **final executive summary** that represents the entire dataset.
 
 Your task:
-- Read the prompt and insight from each chunk carefully.
-- Understand what was asked in each prompt and what the AI observed.
 - Identify trends, recurring patterns, inconsistencies, missing data, 
 - Focus on program outcomes like orientation quality, peer group formation, teacher/student/parent engagement, club formation, data gaps, and field-level execution.
 - Avoid simply listing names — only highlight people/places when relevant to a cross-cutting issue or pattern.
